@@ -1,0 +1,14 @@
+<launch>	
+
+	<include file="$(find robotino_teleop)/launch/joystick_teleop.launch"/>
+		
+	<include file="$(find robotino_node)/launch/robotino_node.launch">
+		<arg name="hostname" value="192.168.1.100"/>
+	</include>
+	
+	<node pkg="degree_work" name="safety_node" type="safety_node" output="screen">
+		<param name="k_gain" value="10.8"/>
+		<param name="distance_to_wall" value="0.48"/>
+	</node>
+
+</launch>

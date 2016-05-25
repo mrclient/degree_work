@@ -1,0 +1,22 @@
+#ifndef MULT_SYSTEM_H_
+#define MULT_SYSTEM_H_
+
+#include <ros/ros.h>
+#include <Robot.hpp>
+
+class MultSystem{
+
+	ros::NodeHandle nh;
+
+	Robot robot1, robot2;
+	Regulator regulator;
+
+
+public:
+	MultSystem();
+	~MultSystem();
+
+	bool run();
+};
+
+#endif /* MULT_SYSTEM_H_ */

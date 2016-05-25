@@ -1,0 +1,188 @@
+#include <AgentProgram_own_system.h>
+
+AgentProgram::AgentProgram() : private_nh("~") {
+
+	if(!private_nh.getParam	("agent_name", agent_name)){
+		ROS_ERROR_STREAM("Agent name has not been specified!");
+		ros::shutdown();
+	}
+	robot.getName(agent_name);
+
+	if(!nh.getParam("/list_of_agents", list_of_agents)){
+		ROS_ERROR_STREAM("List of agents couldn't be read!");
+		ros::shutdown();
+	}
+	number_of_agents = list_of_agents.size();
+
+	master_speed_subs = nh.subscribe("/robot_0/base_pose_ground_truth", 1, &AgentProgram::masterSpeedCallback, this);
+
+	if(!private_nh.getParam	("aims", aims)){
+		ROS_ERROR_STREAM("Needed robot's state has not been specified");
+		ros::shutdown();
+	}
+
+	private_nh.param<double>("k_gain", k_gain, 2.0);
+	private_nh.param<double>("distance_to_wall", distance_to_wall, 0.55);
+	private_nh.param<bool>("obstacle_avoidance", obstacle_avoidance, false);
+	private_nh.param<bool>("use_northstar", use_northstar, false);
+	if(use_northstar) robot.useNorthstar();	
+}
+
+
+
+AgentProgram::~AgentProgram(){
+
+}
+
+
+void AgentProgram::masterSpeedCallback(const nav_msgs::Odometry &msg){
+
+	tf::TransformListener tf_listener;
+	geometry_msgs::Vector3Stamped speed_in_base_link, speed_in_odom;
+	
+	speed_in_odom.header.frame_id = "robot_0/odom";
+	speed_in_odom.vector.x = msg.twist.twist.linear.x;
+	speed_in_odom.vector.y = msg.twist.twist.linear.y;
+
+	bool flag = true;
+	while(ros::ok() && flag){
+		try{
+			flag = false;
+			tf_listener.transformVector("robot_0/base_link", speed_in_odom, speed_in_base_link);
+		}
+		catch (tf::TransformException ex){
+			flag = true;
+			//ROS_ERROR_STREAM(nh.getNamespace() << " " << ex.what());
+			ros::Duration(0.05).sleep();
+		}
+	}
+
+	speed_of_master.linear.x = speed_in_base_link.vector.x;
+	speed_of_master.linear.y = speed_in_base_link.vector.y;
+	speed_of_master.angular.z = msg.twist.twist.angular.z;	
+
+	ROS_INFO_STREAM(speed_of_master);
+}
+
+
+
+std::vector<AgentState> AgentProgram::agentsStates(){
+
+	std::vector<AgentState> states(number_of_agents);	
+	tf::TransformListener tf_listener;
+	tf::StampedTransform transform;
+	static ros::Time begin_time = ros::Time::now();
+	
+	
+	double aim1, aim2;
+	//find robot's coordinates in master's coordinate frame
+	cur_time = ros::Time::now() - begin_time;
+	for(int i = 1; i < number_of_agents; i++){		
+		bool flag = true;
+		while(ros::ok() && flag){
+			try{
+				flag = false;
+				tf_listener.lookupTransform(list_of_agents[0], list_of_agents[i], ros::Time(0), transform);
+			}
+			catch (tf::TransformException ex){
+				flag = true;
+				//ROS_ERROR_STREAM(nh.getNamespace() << " " << ex.what());
+				ros::Duration(0.05).sleep();
+			}
+		}
+		//ROS_INFO_STREAM("robot_" << i+1 << "'s position: x = " << transform.getOrigin().x() << " y = " << transform.getOrigin().y());	
+		aim1 = aims[(i-1)*2] + 0.3 * std::sin(1 * cur_time.toSec());
+		aim2 = aims[(i-1)*2 + 1] + std::pow(-1,i) * 0.3 * std::sin(1 * cur_time.toSec());
+		states[i].transform = transform;
+		states[i].transform.setOrigin(tf::Vector3(aim1 - transform.getOrigin().x(), aim2 - transform.getOrigin().y(), 0.0));		
+	}
+
+	return states;
+}
+
+
+
+
+tf::Vector3 AgentProgram::calculateSpeed(std::vector<AgentState> agents_states, std::vector<tf::Vector3> signals_from_rangers){
+
+	int i;
+	tf::Vector3 speed, final_speed(0.0, 0.0, 0.0);
+	float A[3][3] = {{0, 0, 0}, {1.5, 0, 0}, {1.5, 0, 0}};
+
+	//formation maintaining control
+	for(i = 1; i < number_of_agents; i++){
+		if(list_of_agents[i] == agent_name) break;
+	}
+	
+	switch (i){
+	case 1:
+		speed = -(A[1][0] + A[1][2]) * agents_states[1].transform.getOrigin() + A[1][2] * agents_states[2].transform.getOrigin();
+		break;		
+	case 2:
+		speed = -(A[2][0] + A[2][1]) * agents_states[2].transform.getOrigin() + A[2][1] * agents_states[1].transform.getOrigin();
+		break;
+	default:
+		ros::shutdown();	
+	}
+	//ROS_INFO_STREAM(speed_of_master);
+	speed = tf::Vector3(0.3 * std::cos(1 * cur_time.toSec()), std::pow(-1,i) * 0.3 * std::cos(1 * cur_time.toSec()), 0.0) - speed + 
+		tf::Vector3(speed_of_master.linear.x, speed_of_master.linear.y, 0.0) + speed_of_master.angular.z * 
+		tf::Vector3(agents_states[i].transform.getOrigin().y(), -agents_states[i].transform.getOrigin().x(), 0.0);
+
+	double alpha = tf::getYaw( agents_states[i].transform.getRotation() );
+	final_speed.setX(speed.x() * std::cos(alpha) + speed.y() * std::sin(alpha));
+	final_speed.setY(-speed.x() * std::sin(alpha) + speed.y() * std::cos(alpha));
+	
+
+	if(obstacle_avoidance){	
+		//obstacles avoiding control
+		if(speed.length() != 0.0){
+			for(i = 0; i < signals_from_rangers.size(); i++){		
+				double alpha;
+				if(signals_from_rangers[i].length() < distance_to_wall){
+					alpha = speed.angle(signals_from_rangers[i]);
+					if(std::abs(alpha) < std::abs(M_PI / 2))
+						speed -= signals_from_rangers[i].normalized() * speed.length() * std::cos(alpha);		
+				}
+			}
+		}
+	
+		for(i = 0; i < signals_from_rangers.size(); i++){		
+			if(signals_from_rangers[i].length() < distance_to_wall){
+				speed -= signals_from_rangers[i].normalized() * k_gain * (distance_to_wall - signals_from_rangers[i].length());	
+			}
+		}
+	}
+	tf::TransformListener tf_listener;
+	
+	return final_speed;
+}
+
+
+
+
+void AgentProgram::run(){
+
+	ros::Rate loop_rate(20);
+	
+	tf::TransformListener tf_listener;
+	//Waiting for "projector" frame's appearance
+	while(ros::ok() && !tf_listener.frameExists("projector") && use_northstar){
+		ros::spinOnce();
+		ROS_INFO_STREAM(nh.getNamespace() << " " << "loop");
+		loop_rate.sleep();
+	}
+	ros::Duration(3.0).sleep();
+
+	ROS_INFO_STREAM(nh.getNamespace() << " " <<"Main program has started");
+	//main program loop
+	tf::Vector3 speed;
+	while(ros::ok()){
+ 		speed = calculateSpeed(agentsStates(), robot.signals_from_rangers);		
+		robot.move(speed);
+		//ROS_INFO_STREAM(nh.getNamespace() << " " << "Speed was sent");
+		ros::spinOnce();
+		loop_rate.sleep();
+	}
+}
+

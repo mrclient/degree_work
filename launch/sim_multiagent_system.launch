@@ -1,0 +1,33 @@
+<launch>
+	<param name="use_sim_time" value="true" />
+	
+	<rosparam command="load" file="$(find degree_work)/config/sim_list_of_agents.yaml"/>
+	
+	<node name="stageros" pkg="stage_ros" type="stageros" args="$(find degree_work)/config/sim_world.world" />
+	
+	<node name="robot1_agent_program" pkg="degree_work" type="agent_program" output="screen" ns="robot_1">
+		<param name="agent_name" value="robot_1/base_link" />	
+		<!--<rosparam param="aims"> [-1.0, 1.0, -1.0, -1.0] </rosparam>-->
+		<rosparam param="aims"> [-1.0, 1.0] </rosparam>
+		<param name="k_gain" value="2.0"/>
+		<param name="distance_to_wall" value="0.55"/>
+		<param name="use_northstar" value="false"/>
+		<param name="obstacle_avoidance" value="false"/>
+	</node>
+
+	<node name="robot2_agent_program" pkg="degree_work" type="agent_program" output="screen" ns="robot_2">
+		<param name="agent_name" value="robot_2/base_link" />
+		<!--<rosparam param="aims"> [-1.0, 1.0, -1.0, -1.0] </rosparam>-->
+		<rosparam param="aims"> [-1.0, -1.0] </rosparam>-->
+		<param name="k_gain" value="2.0"/>
+		<param name="distance_to_wall" value="0.55"/>
+		<param name="use_northstar" value="false"/>
+		<param name="obstacle_avoidance" value="false"/>
+	</node>
+	
+	<node pkg="tf" type="static_transform_publisher" name="robot1_to_robot2_odoms" args="-1 1 0 0 0 0 robot_0/odom robot_1/odom 10"/>
+	<node pkg="tf" type="static_transform_publisher" name="robot1_to_robot3_odoms" args="-1 -1 0 0 0 0 robot_0/odom robot_2/odom 10"/>
+	
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find degree_work)/config/rviz_for_sim.rviz"/>
+	<!--<node pkg="rosbag" type="play" name="playback" args="/home/evgeniy/commands.bag"/>-->
+</launch>

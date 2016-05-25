@@ -1,0 +1,60 @@
+<launch>
+
+	<rosparam command="load" file="$(find degree_work)/config/list_of_agents.yaml"/>
+	<rosparam command="load" file="$(find degree_work)/config/master_pose.yaml"/>
+
+
+
+
+	<!--<include file="$(find robotino_node)/launch/only_robotino_node.launch" ns="robot1">
+		<arg name="hostname" value="192.168.1.185"/>
+	</include>
+	
+	<node name="broadcast_NS_node" pkg="degree_work" type="broadcastNS_node" output="screen" ns="robot1">
+		<param name="robot_name" value="robot1" />	
+	</node>
+
+	<node name="robot1_agent_program" pkg="degree_work" type="agent_program" output="screen" ns="robot1">
+		<param name="agent_name" value="robot1" />	
+		<rosparam param="aims"> [1.0, 1.0] </rosparam>	
+		<param name="k_gain" value="2.0"/>x	
+		<param name="distance_to_wall" value="0.55"/>
+		<param name="use_northstar" value="false"/>
+		<param name="obstacle_avoidance" value="true"/>
+	</node>-->
+	
+
+
+	<include file="$(find robotino_node)/launch/only_robotino_node.launch" ns="robot2">
+		<arg name="hostname" value="192.168.1.100"/>
+	</include>
+
+	<node name="robot2_agent_program" pkg="degree_work" type="simple_node" output="screen" ns="robot2">
+		<param name="agent_name" value="robot2" />
+		<param name="master_name" value="master" />
+		<rosparam param="aims"> [0.0, -1.0] </rosparam>	
+		<param name="KR" value="10.8"/>
+		<param name="KP" value="1.0"/>
+		<param name="KI" value="0.7"/>
+		<param name="KD" value="0.1"/>
+		<param name="distance_to_wall" value="0.48"/>
+		<param name="obstacle_avoidance" value="true"/>
+	</node>
+
+	<include file="$(find robotino_node)/launch/only_robotino_node.launch" ns="robot1">
+		<arg name="hostname" value="192.168.1.101"/>
+	</include>
+
+	<node name="robot1_agent_program" pkg="degree_work" type="simple_node" output="screen" ns="robot1">
+		<param name="agent_name" value="robot1" />
+		<param name="master_name" value="master" />
+		<rosparam param="aims"> [0.8, 0.0] </rosparam>	
+		<param name="KR" value="10.8"/>
+		<param name="KP" value="1.0"/>
+		<param name="KI" value="0.4"/>
+		<param name="KD" value="0.1"/>
+		<param name="distance_to_wall" value="0.48"/>
+		<param name="obstacle_avoidance" value="true"/>
+	</node>
+
+</launch>

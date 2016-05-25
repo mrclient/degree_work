@@ -1,0 +1,4 @@
+list_of_agents:
+ - 'master'
+ - 'robot1'
+ - 'robot2'

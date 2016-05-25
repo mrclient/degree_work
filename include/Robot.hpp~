@@ -1,0 +1,28 @@
+#ifndef ROBOT_H_
+#define ROBOT_H_
+
+#include <ros/ros.h>
+#include <robotino_msgs/NorthStarReadings.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
+#include <geometry_msgs/Twist>
+#include <string>
+
+class Robot{
+
+	ros::NodeHandle nh;
+	ros::Publisher speeds_publisher;
+	ros::Subscriber northstar_subscriber;
+	std::string name;	
+
+	void northStarCallback(); 
+
+public:
+	Robot();
+	~Robot();
+
+
+	void move();
+};
+
+#endif /* ROBOT_H_ */

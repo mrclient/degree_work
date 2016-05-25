@@ -1,0 +1,27 @@
+#include <MultSystem.hpp>
+
+MultSystem::MultSystem() : nh_("~") {
+	
+
+}
+
+
+MultSystem::~MultSystem(){
+
+
+}
+
+
+bool MultSystem::run(){
+
+	ros::Rate loop_rate( 30 );
+
+	while(nh_.ok())
+	{
+		ros::spinOnce();
+
+		loop_rate.sleep();
+	}
+	return true;
+}
+

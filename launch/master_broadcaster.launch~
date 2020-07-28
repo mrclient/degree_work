@@ -1,8 +1,0 @@
-<launch>
-
-	<rosparam command="load" file="$(find degree_work)/config/list_of_agents.yaml"/>
-	<rosparam command="load" file="$(find degree_work)/config/master_pose.yaml"/>
-	
-	<node name="master_broadcast_node" pkg="degree_work" type="master_broadcaster_node" output="screen" required="true"/>
-
-</launch>
